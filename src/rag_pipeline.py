@@ -1,64 +1,56 @@
-import torch
-from transformers import pipeline
-
+import os
+from dotenv import load_dotenv
+from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
-from langchain_community.llms import HuggingFacePipeline
 
-
-# This makes sure that the file work with either version of LC
-try:
-    from langchain.chains import RetrievalQA
-except ImportError:
-    from langchain_classic.chains import RetrievalQA
-
-from src.embedding import rerank_documents
-
+# Load environment variables from .env file
+load_dotenv()
 
 def create_rag_pipeline(vector_store):
-    #Create and return a RAG pipeline
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    hf_pipeline = pipeline(
-        'text2text-generation',
-        model='google/flan-t5-base',
-        device=device,
-        max_new_tokens=100,
+    """
+    Initializes the Groq LLM and the prompt template.
+    """
+    # Initialize Groq LLM with the currently supported, high-speed model
+    llm = ChatGroq(
+        model_name="openai/gpt-oss-20b",  # <-- UPDATED to Groq's current recommended model
+        temperature=0.0,
+        groq_api_key=os.getenv("GROQ_API_KEY")
     )
 
-    #connecting the rag to hf
-    llm = HuggingFacePipeline(pipeline=hf_pipeline)
-
-    #prompt template
+    # Strict prompt to prevent hallucinations
     prompt = PromptTemplate(
-        template="Answer the question based on the context: {context}\nQuestion: {question}\nAnswer:",
+        template=(
+            "You are a helpful AI assistant. Answer the question based *only* on the provided context. "
+            "If the context does not contain the answer, strictly reply with 'I don't know based on the provided documents.'\n\n"
+            "Context: {context}\n\n"
+            "Question: {question}\n\n"
+            "Answer:"
+        ),
         input_variables=["context", "question"]
     )
 
-    #concatenates all retrieved documents into a single prompt
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        
-        retriever=vector_store.as_retriever(
-            search_type="similarity",
-            search_kwargs={"k": 2}
-        ),
-        return_source_documents=True,
-        input_key="question",
-        output_key="answer",
-        chain_type_kwargs={"prompt": prompt}
-    )
-    return qa_chain
+    # Modern LangChain (LCEL) syntax: connects prompt directly to the LLM
+    chain = prompt | llm
+    return chain
 
 
 def get_answer(qa_chain, vector_store, question):
-    #Get the answer to a question using the RAG pipeline
-    #Calls the rerank_document function to get the best possible context
-    ranked_docs = rerank_documents(vector_store, question, top_k=2)
+    """
+    Fetches the best context using your custom reranker, 
+    then passes it to the Groq LLM to generate the answer.
+    """
+    from src.embedding import rerank_documents
     
-    #Joins the reranked documents into a single string
+    # 1. Get the top 2 most relevant documents using your reranker
+    ranked_docs = rerank_documents(vector_store, question, top_k=2)
     context = '\n'.join(doc.page_content for doc in ranked_docs)
     
-    #store the value of query and context
-    result = qa_chain({'question': question, 'context': context})
-    return result.get('answer', result.get('result', 'No answer found'))
+    # 2. Safety check: if no context was found
+    if not context.strip():
+        return "No relevant information found in the documents to answer this question."
+
+    # 3. Pass the context and question to the Groq chain
+    response = qa_chain.invoke({"context": context, "question": question})
+    
+    # ChatGroq returns a message object; .content extracts the actual text string
+    return response.content

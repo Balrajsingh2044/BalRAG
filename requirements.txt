@@ -8,3 +8,6 @@ torch
 pypdf
 beautifulsoup4
 python-dotenv
+openai
+langchain-openai
+langchain-groq
