@@ -1,8 +1,12 @@
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from sentence_transformers import util
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 
 def create_vector_store(documents):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=100,)
+    chunked_docs = text_splitter.split_documents(documents)
     #create and return a FAISS vector store from the given documents
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     

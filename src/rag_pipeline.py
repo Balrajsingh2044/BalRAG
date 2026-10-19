@@ -25,7 +25,7 @@ def create_rag_pipeline(vector_store):
         max_new_tokens=100,
     )
 
-    #connecting the rag to llm
+    #connecting the rag to hf
     llm = HuggingFacePipeline(pipeline=hf_pipeline)
 
     #prompt template
@@ -34,9 +34,11 @@ def create_rag_pipeline(vector_store):
         input_variables=["context", "question"]
     )
 
+    #concatenates all retrieved documents into a single prompt
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
+        
         retriever=vector_store.as_retriever(
             search_type="similarity",
             search_kwargs={"k": 2}
@@ -51,7 +53,12 @@ def create_rag_pipeline(vector_store):
 
 def get_answer(qa_chain, vector_store, question):
     #Get the answer to a question using the RAG pipeline
+    #Calls the rerank_document function to get the best possible context
     ranked_docs = rerank_documents(vector_store, question, top_k=2)
+    
+    #Joins the reranked documents into a single string
     context = '\n'.join(doc.page_content for doc in ranked_docs)
+    
+    #store the value of query and context
     result = qa_chain({'question': question, 'context': context})
     return result.get('answer', result.get('result', 'No answer found'))

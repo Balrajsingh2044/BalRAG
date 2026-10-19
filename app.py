@@ -1,5 +1,7 @@
 import os
 os.environ["USER_AGENT"] = "BalRAG/1.0"
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 
 import streamlit as st
 from src.document_loader import load_documents
@@ -44,11 +46,20 @@ with st.sidebar:
             
         #when the button is pressed the it saves the uploaded PDF locally and routes all inputs to the loaders 
         if all_docs:
-            #The resulting documents are passed to create_vector_store to embed and store them and then to create_rag_pipeline to link the data with LLM
-            st.session_state.vector_store = create_vector_store(all_docs)
+            # --- NEW CHUNKING STEP ---
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=500,      # Size of each chunk in characters
+                chunk_overlap=50,    # Overlap to preserve context between chunks
+                length_function=len,
+            )
+            # Split all collected documents into smaller, manageable chunks
+            chunked_docs = text_splitter.split_documents(all_docs)
+            # -------------------------
+
+            # Pass the CHUNKED documents to the vector store instead of all_docs
+            st.session_state.vector_store = create_vector_store(chunked_docs)
             st.session_state.pipeline = create_rag_pipeline(st.session_state.vector_store)
-            st.success("Documents processed successfully!")
-            
+            st.success(f"Documents processed successfully! Created {len(chunked_docs)} chunks.")
         else:
             st.error("No valid input provided.")
 
