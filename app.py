@@ -7,7 +7,7 @@ from src.embedding import create_vector_store, rerank_documents
 from src.rag_pipeline import create_rag_pipeline, get_answer
 import time
 
-# Initialize session state
+# Initialize session state to save the sata in local drive or persistent memory in cloud some where
 if 'vector_store' not in st.session_state:
     st.session_state.vector_store = None
 if 'pipeline' not in st.session_state:
@@ -41,8 +41,10 @@ with st.sidebar:
         if raw_text:
             text_docs = load_documents("text", raw_text)
             all_docs.extend(text_docs)
-
+            
+        #when the button is pressed the it saves the uploaded PDF locally and routes all inputs to the loaders 
         if all_docs:
+            #The resulting documents are passed to create_vector_store to embed and store them and then to create_rag_pipeline to link the data with LLM
             st.session_state.vector_store = create_vector_store(all_docs)
             st.session_state.pipeline = create_rag_pipeline(st.session_state.vector_store)
             st.success("Documents processed successfully!")
