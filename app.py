@@ -16,25 +16,28 @@ if 'pipeline' not in st.session_state:
 st.title('BalRAG')
 st.subheader('Balraj Singh\'s RAG-based AI Assistant for Document Analysis')
 
-# Input section
+# Document Input section
 with st.sidebar:
     st.header("Document Input")
     pdf_file = st.file_uploader("Upload PDF", type="pdf")
-    url = st.text_input("Enter URL", placeholder="https://example.com")
-    raw_text = st.text_area("Enter Raw Text", height=100)
+    url = st.text_input("Enter URL", placeholder="https://example.com") #not working right now
+    raw_text = st.text_area("Enter Raw Text", height=100) #text of 100 lines can be inputed in the text section
     process_btn = st.button("Process Documents")
 
     if process_btn:
         all_docs = []
+        
         if pdf_file:
             pdf_path = pdf_file.name
             with open(pdf_path, "wb") as f:
                 f.write(pdf_file.getbuffer())
             pdf_docs = load_documents("pdf", pdf_path)
             all_docs.extend(pdf_docs)
+            
         if url:
             url_docs = load_documents("url", url)
             all_docs.extend(url_docs)
+            
         if raw_text:
             text_docs = load_documents("text", raw_text)
             all_docs.extend(text_docs)
@@ -43,12 +46,15 @@ with st.sidebar:
             st.session_state.vector_store = create_vector_store(all_docs)
             st.session_state.pipeline = create_rag_pipeline(st.session_state.vector_store)
             st.success("Documents processed successfully!")
+            
         else:
             st.error("No valid input provided.")
 
-# Chat Section
+# Query input Section
+#it is customize to enter the query + context into the vectorDB to check it against the similar options 
 question = st.text_input("Ask a Question", key="question_input", placeholder="Type your question here")
 
+#Output generation section
 answer = None
 if st.button("Get Answer", key="get_answer_btn"):
     if st.session_state.pipeline and st.session_state.vector_store:
@@ -63,6 +69,7 @@ if st.button("Get Answer", key="get_answer_btn"):
     else:
         st.error("Please process documents first.")
 
+#history section
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if question and answer:

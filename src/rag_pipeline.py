@@ -4,9 +4,8 @@ from transformers import pipeline
 from langchain_core.prompts import PromptTemplate
 from langchain_community.llms import HuggingFacePipeline
 
-# LangChain 0.3.x keeps RetrievalQA in langchain.chains.
-# LangChain 1.x moved it into langchain_classic.chains.
-# This try/except makes the file work with either version.
+
+# This makes sure that the file work with either version of LC
 try:
     from langchain.chains import RetrievalQA
 except ImportError:
@@ -16,7 +15,7 @@ from src.embedding import rerank_documents
 
 
 def create_rag_pipeline(vector_store):
-    '''Create and return a RAG pipeline.'''
+    #Create and return a RAG pipeline
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     hf_pipeline = pipeline(
@@ -26,8 +25,10 @@ def create_rag_pipeline(vector_store):
         max_new_tokens=100,
     )
 
+    #connecting the rag to llm
     llm = HuggingFacePipeline(pipeline=hf_pipeline)
 
+    #prompt template
     prompt = PromptTemplate(
         template="Answer the question based on the context: {context}\nQuestion: {question}\nAnswer:",
         input_variables=["context", "question"]
@@ -49,7 +50,7 @@ def create_rag_pipeline(vector_store):
 
 
 def get_answer(qa_chain, vector_store, question):
-    '''Get the answer to a question using the RAG pipeline.'''
+    #Get the answer to a question using the RAG pipeline
     ranked_docs = rerank_documents(vector_store, question, top_k=2)
     context = '\n'.join(doc.page_content for doc in ranked_docs)
     result = qa_chain({'question': question, 'context': context})
